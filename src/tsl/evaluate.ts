@@ -1,5 +1,6 @@
 import * as acorn from 'acorn'
 import * as TSL from 'three/tsl'
+import { UNIFORM_SCOPE } from './uniforms'
 
 /** A top-level variable binding the user can wire a preview to. */
 export type TslBinding = { name: string; line: number }
@@ -105,14 +106,16 @@ export function evaluateTSL(source: string): EvalResult {
   }
 
   try {
-    // Sandbox: TSL identifiers resolve via `with`; sloppy mode allows it.
+    // Sandbox: identifiers resolve via nested `with` (sloppy mode allows it).
+    // The inner uniform scope shadows TSL built-ins of the same name (`time`).
     const fn = new Function(
       'TSL',
+      'U',
       '__tap',
       '__final',
-      `with (TSL) {\n${body}\n}`,
+      `with (TSL) { with (U) {\n${body}\n} }`,
     )
-    fn(TSL, tap, final)
+    fn(TSL, UNIFORM_SCOPE, tap, final)
   } catch (e) {
     return {
       bindings,

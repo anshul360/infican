@@ -43,6 +43,8 @@ type ProjectState = {
   removeNode: (id: string) => void
 
   hydrate: () => Promise<void>
+  exportDoc: () => ProjectDoc
+  loadDoc: (doc: ProjectDoc) => void
 }
 
 // --- debounced persistence -------------------------------------------------
@@ -176,6 +178,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } else {
       set({ hydrated: true })
     }
+  },
+
+  exportDoc: () => {
+    const { nodes, edges, viewport } = get()
+    return { id: 'default', name: 'Untitled', nodes, edges, viewport }
+  },
+  loadDoc: (doc) => {
+    set({
+      nodes: doc.nodes,
+      edges: doc.edges,
+      viewport: doc.viewport,
+    })
+    scheduleSave(get)
   },
 }))
 

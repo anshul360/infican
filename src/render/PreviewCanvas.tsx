@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three/webgpu'
-import { uv, vec2, vec3, sin, time, texture } from 'three/tsl'
+import { uv, vec2, vec3, sin, texture } from 'three/tsl'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useProjectStore } from '#/store/project'
 import { useCompileStore } from '#/tsl/compile'
+import {
+  advanceTime,
+  aspectUniform,
+  mouseUniform,
+  resolutionUniform,
+  timeUniform,
+} from '#/tsl/uniforms'
 import type { MaterialSlot } from '#/store/types'
 import { WebGPUCanvas } from './WebGPUCanvas'
 
@@ -29,7 +36,7 @@ function createGpuPreview(): GpuPreview {
   const material = new THREE.MeshStandardNodeMaterial()
   // Animated placeholder shown until an editor line is wired in.
   const p = uv()
-  const placeholder = vec3(p.x, p.y, sin(time).mul(0.5).add(0.5))
+  const placeholder = vec3(p.x, p.y, sin(timeUniform).mul(0.5).add(0.5))
   material.colorNode = placeholder
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material))
 
@@ -94,6 +101,7 @@ function disposeGpuPreview(g: GpuPreview) {
 function PreviewRenderer() {
   const gl = useThree((s) => s.gl) as unknown as THREE.WebGPURenderer
   const map = useRef(new Map<string, GpuPreview>())
+  const pointer = useRef({ x: 0, y: 0 })
 
   const { compScene, compCam } = useMemo(() => {
     const scene = new THREE.Scene()
@@ -104,11 +112,20 @@ function PreviewRenderer() {
 
   useEffect(() => {
     gl.setClearColor(0x000000, 0) // transparent overlay
+    const onMove = (e: PointerEvent) => {
+      pointer.current.x = e.clientX
+      pointer.current.y = e.clientY
+    }
+    window.addEventListener('pointermove', onMove)
+    return () => window.removeEventListener('pointermove', onMove)
   }, [gl])
 
-  useFrame(() => {
+  useFrame((_, delta) => {
+    advanceTime(delta)
+
     const W = window.innerWidth
     const H = window.innerHeight
+    const dpr = Math.min(window.devicePixelRatio, 2)
     const previews = useProjectStore
       .getState()
       .nodes.filter((n) => n.type === 'preview')
@@ -152,6 +169,16 @@ function PreviewRenderer() {
         continue
       }
       g.quad.visible = true
+
+      // Per-preview uniforms (set before this preview's render; values are read
+      // at render time so sequential previews each get their own).
+      resolutionUniform.value.set(r.width * dpr, r.height * dpr)
+      aspectUniform.value = r.width / r.height
+      mouseUniform.value.set(
+        (pointer.current.x - r.left) / r.width,
+        1 - (pointer.current.y - r.top) / r.height, // flip Y to match UV
+      )
+
       gl.setRenderTarget(g.rt)
       gl.render(g.scene, g.camera)
 

@@ -1,6 +1,7 @@
 import { Handle, NodeResizer, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
 import { Code2, X } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import { useProjectStore } from '#/store/project'
 import { CodeEditor } from '#/editor/CodeEditor'
 import type { EditorNode as EditorNodeType } from '#/store/types'
@@ -8,6 +9,19 @@ import type { EditorNode as EditorNodeType } from '#/store/types'
 export function EditorNode({ id, data, selected }: NodeProps<EditorNodeType>) {
   const setEditorCode = useProjectStore((s) => s.setEditorCode)
   const removeNode = useProjectStore((s) => s.removeNode)
+  // Lines of this editor currently visualised by a preview.
+  const boundLines = useProjectStore(
+    useShallow((s) =>
+      s.nodes
+        .filter(
+          (n) =>
+            n.type === 'preview' &&
+            n.data.sourceEditorId === id &&
+            n.data.line != null,
+        )
+        .map((n) => (n as { data: { line: number } }).data.line),
+    ),
+  )
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-neutral-700 bg-neutral-900 shadow-lg">
@@ -34,6 +48,7 @@ export function EditorNode({ id, data, selected }: NodeProps<EditorNodeType>) {
         <CodeEditor
           value={data.code}
           onChange={(code) => setEditorCode(id, code)}
+          boundLines={boundLines}
         />
       </div>
 

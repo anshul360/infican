@@ -21,13 +21,20 @@ export function ShaderCompiler() {
     for (const e of editors) {
       const code = e.data.code
       if (lastCode.current.get(e.id) === code) continue
+      const firstSight = !lastCode.current.has(e.id)
       lastCode.current.set(e.id, code)
       const existing = timers.current.get(e.id)
       if (existing) clearTimeout(existing)
-      timers.current.set(
-        e.id,
-        setTimeout(() => compile(e.id, code), 150),
-      )
+      if (firstSight) {
+        // Compile straight away on hydration / node creation so connected
+        // previews render without needing an edit first.
+        compile(e.id, code)
+      } else {
+        timers.current.set(
+          e.id,
+          setTimeout(() => compile(e.id, code), 150),
+        )
+      }
     }
 
     for (const id of [...lastCode.current.keys()]) {
